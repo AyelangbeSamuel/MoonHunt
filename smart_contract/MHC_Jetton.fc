@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract MoonHuntCoin {
+    string public name = "MoonHunt Coin";
+    string public symbol = "MHC";
+    uint8 public decimals = 18;
+    uint256 public totalSupply;
+    address public owner;
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    mapping(address => bool) public eliminated;
+    
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Elimination(address indexed user, uint256 burnedAmount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not contract owner");
+        _;
+    }
+
+    constructor(uint256 _initialSupply) {
+        owner = msg.sender;
+        totalSupply = _initialSupply * (10 ** uint256(decimals));
+        balanceOf[owner] = totalSupply;
+        emit Transfer(address(0), owner, totalSupply);
+    }
+
+    function transfer(address _to, uint256 _value) public returns (bool success) {
+        require(balanceOf[msg.sender] >= _value, "Insufficient balance");
+        require(!eliminated[msg.sender], "Eliminated users cannot transfer");
+        
+        balanceOf[msg.sender] -= _value;
+        balanceOf[_to] += _value;
+        emit Transfer(msg.sender, _to, _value);
+        return true;
+    }
+
+    function approve(address _spender, uint256 _value) public returns (bool success) {
+        allowance[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
+        return true;
+    }
+
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+        require(balanceOf[_from] >= _value, "Insufficient balance");
+        require(allowance[_from][msg.sender] >= _value, "Allowance exceeded");
+        require(!eliminated[_from], "Eliminated users cannot transfer");
+        
+        balanceOf[_from] -= _value;
+        balanceOf[_to] += _value;
+        allowance[_from][msg.sender] -= _value;
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+
+    function eliminateUser(address _user) public onlyOwner {
+        require(balanceOf[_user] > 0, "User has no tokens");
+        
+        uint256 burnAmount = (balanceOf[_user] * 30) / 100;
+        uint256 liquidityAmount = (balanceOf[_user] * 50) / 100;
+        uint256 userRemaining = balanceOf[_user] - (burnAmount + liquidityAmount);
+        
+        balanceOf[_user] = userRemaining;
+        totalSupply -= burnAmount;
+        
+        eliminated[_user] = true;
+        emit Elimination(_user, burnAmount);
+    }
+}
